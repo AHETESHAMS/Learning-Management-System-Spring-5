@@ -1,0 +1,47 @@
+package com.bridgelabz.user.service;
+
+import java.time.LocalDate;
+import java.util.Optional;
+
+import org.modelmapper.ModelMapper;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.web.reactive.function.server.ServerResponse;
+
+import com.bridgelabz.exceptions.RegistrationException;
+import com.bridgelabz.user.dto.UserDto;
+import com.bridgelabz.user.model.User;
+import com.bridgelabz.user.repository.UserRepository;
+import com.bridgelabz.util.StatusHelper;
+
+import reactor.core.publisher.Mono;
+
+@Service
+public class UserServiceImpl implements IUserService {
+	
+	@Autowired
+	UserRepository userRepository;
+	
+	@Autowired
+	private ModelMapper modelMapper;
+
+	@Override
+	public Mono<ServerResponse> save(UserDto userDto) {
+		User user = modelMapper.map(userDto, User.class);
+		System.out.println("Before Mapping");
+		Optional<User> userExist = userRepository.findByEmail(user.getEmail());
+		System.out.println("After Mapping"+user.toString());
+		user.setRegisteredDate(LocalDate.now()); 
+		if (userExist.isPresent()) {
+	        return Mono.error(new RegistrationException(HttpStatus.BAD_REQUEST.value(), "User with the provided email already exists"));
+	    } else {
+	    	System.out.println("Inside Else");
+	        return userRepository.save(user)
+	            .flatMap(savedUser -> ServerResponse.ok().bodyValue(StatusHelper.statusInfo("User registered successfully", HttpStatus.OK.value())))
+	            .switchIfEmpty(ServerResponse.status(HttpStatus.INTERNAL_SERVER_ERROR).build());
+	    }
+	}
+
+
+}

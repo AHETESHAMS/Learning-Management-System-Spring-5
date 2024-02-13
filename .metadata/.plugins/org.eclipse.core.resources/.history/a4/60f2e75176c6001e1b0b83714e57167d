@@ -1,0 +1,18 @@
+package com.bridgelabz.exceptionhandler;
+
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+import com.bridgelabz.exceptions.RegistrationExceptions;
+import com.bridgelabz.response.Response;
+import com.bridgelabz.util.StatusHelper;
+
+import reactor.core.publisher.Mono;
+
+@RestControllerAdvice
+public class ExceptionHandler {
+	
+	public Mono<Response> registrationExceptionHandler(RegistrationExceptions registrationExceptions) {
+		
+		Response response = StatusHelper.statusInfo("User Exist", 201);
+	}
+}
