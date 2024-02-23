@@ -1,5 +1,7 @@
 package com.bridgelabz.user.service;
 
+import java.io.UnsupportedEncodingException;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.reactive.function.server.ServerResponse;
 

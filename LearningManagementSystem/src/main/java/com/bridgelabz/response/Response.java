@@ -1,12 +1,16 @@
 package com.bridgelabz.response;
 
+import org.springframework.http.HttpStatus;
+
 public class Response {
 
 	private String message;
 	private int code;
-	public Response()
-	{
-		
+	
+	public Response(String message, int code) {
+		super();
+		this.message = message;
+		this.code = code;
 	}
 	public String getMessage() {
 		return message;

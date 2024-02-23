@@ -1,8 +1,0 @@
-package com.bridgelabz.user.service;
-
-import com.bridgelabz.user.model.User;
-
-public interface IUserService {
-
-	String save(User user);
-}

@@ -1,0 +1,130 @@
+package com.bridgelabz.user.service;
+
+import java.io.UnsupportedEncodingException;
+import java.time.LocalDate;
+
+import javax.security.auth.login.LoginException;
+
+import org.modelmapper.ModelMapper;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+
+import com.bridgelabz.exceptions.LoginExceptions;
+import com.bridgelabz.exceptions.RegistrationException;
+import com.bridgelabz.user.dto.LoginDto;
+import com.bridgelabz.user.dto.UserDto;
+import com.bridgelabz.user.model.User;
+import com.bridgelabz.user.repository.UserRepository;
+import com.bridgelabz.util.StatusHelper;
+import com.bridgelabz.util.UserToken;
+
+import reactor.core.publisher.Mono;
+
+@Service
+public class UserServiceImpl implements IUserService {
+	
+	@Autowired
+	UserRepository userRepository;
+	
+	@Autowired
+	private ModelMapper modelMapper;
+	
+	@Autowired
+	EmailService emailService;
+	
+	@Autowired
+	PasswordEncoder passwordEncoder;
+
+
+	public Mono<Object> save(UserDto userDto) {
+		
+		userDto.setPassword(passwordEncoder.encode(userDto.getPassword()));  
+	    User user = modelMapper.map(userDto, User.class);
+	    System.out.println("Before Mapping DTO: " + userDto); 
+	    user.setRegisterdate(LocalDate.now());
+	       
+	    return userRepository.findByEmail(user.getEmail())
+	    		.flatMap(userExist -> Mono.error(new RegistrationException(HttpStatus.BAD_REQUEST.value(), "User Exist")))
+	    		.switchIfEmpty(userRepository.save(user)
+	    				.then(Mono.just(ResponseEntity.ok().body(StatusHelper.statusInfo("User Saved", HttpStatus.OK.value())))));
+	    		    	   
+	    	   
+	    	   
+//	   return userRepository.findByEmail(user.getEmail())
+//	            .flatMap(existingUser -> Mono.error(new RegistrationException(HttpStatus.BAD_REQUEST.value(), "User with the provided email already exists")))
+//	            .switchIfEmpty(userRepository.save(user)
+//	                    .then(Mono.just(ResponseEntity.ok().body(StatusHelper.statusInfo("User registered successfully", HttpStatus.OK.value()))))
+//	                    .onErrorResume(error -> Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build())));
+	}
+	
+	public Mono<Object> loginService(LoginDto loginDto) {
+		 String token;
+		 return userRepository.findByEmail(loginDto.getEmail())
+		            .flatMap(user -> {
+						try {
+							token = UserToken.generateToken(user.getId());
+						} catch (IllegalArgumentException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+						} catch (UnsupportedEncodingException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+						}
+		                if (passwordEncoder.matches(loginDto.getPassword(), user.getPassword())) {
+		                    return Mono.just(ResponseEntity.ok().body(StatusHelper.loginStatus(
+		                            "User Logged In",
+		                            HttpStatus.OK.value(),
+		                            token,
+		                            user.getName(),
+		                            user.getEmail())));
+		                } else {
+		                    return Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
+		                            new LoginExceptions(
+		                                    "Incorrect Password",
+		                                    token,
+		                                    HttpStatus.BAD_REQUEST.value())));
+		                }
+		            });
+
+		
+//		return userRepository.findByEmail(loginDto.getEmail())
+//				.flatMap(user -> {
+//					
+//					String token = UserToken.generateToken(user.getId());
+//					if(passwordEncoder.matches(loginDto.getPassword(), user.getPassword())) {
+//							return Mono.just(ResponseEntity.ok().body(StatusHelper.loginStatus("User Logged In", HttpStatus.OK.value(), token, user.getName(), user.getEmail())))
+//							   .thenReturn(Mono.just(new LoginExceptions("Incorrect Password", token, HttpStatus.BAD_REQUEST.value())))
+//							   .switchIfEmpty(Mono.error(new LoginExceptions("User Not Exist", token, HttpStatus.BAD_REQUEST.value())));
+//					}
+//					
+//				});
+	}
+	
+//	public Mono<Object> loginService(LoginDto loginDto) {
+//		
+//		return userRepository.findByEmail(loginDto.getEmail())
+//			    .flatMap((User user) -> {
+//			        if (user == null) {
+//			            return Mono.error(new LoginExceptions("User Not Exist", token, 0);
+//			        } else if (passwordEncoder.matches(loginDto.getPassword(), user.getPassword())) {
+//			            try {
+//			                String token = UserToken.generateToken(user.getId());
+//			                return Mono.just((Object) StatusHelper.loginStatus(
+//			                    "Login successful",
+//			                    HttpStatus.OK.value(),
+//			                    token, user.getName(), user.getEmail()));
+//			            } catch (IllegalArgumentException | UnsupportedEncodingException e) {
+//			                return Mono.error(e);
+//			            }
+//			        } else {
+//			            return Mono.error(new LoginExceptions(null, null, 0));
+//			        }
+//			    });
+//	}
+	
+}
+

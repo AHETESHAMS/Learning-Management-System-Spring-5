@@ -1,8 +1,10 @@
 package com.bridgelabz.user.controller;
 
+import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -11,6 +13,8 @@ import org.springframework.web.reactive.function.server.ServerResponse;
 
 import com.bridgelabz.exceptions.RegistrationException;
 import com.bridgelabz.response.Response;
+import com.bridgelabz.response.ResponseToken;
+import com.bridgelabz.user.dto.LoginDto;
 import com.bridgelabz.user.dto.UserDto;
 import com.bridgelabz.user.model.User;
 import com.bridgelabz.user.service.UserServiceImpl;
@@ -33,6 +37,16 @@ public class UserRestController {
                     return Mono.just(ResponseEntity.badRequest().body(StatusHelper.statusInfo(ex.getMessage(), HttpStatus.BAD_REQUEST.value())));
                 });
     
+	}
+	
+	@PostMapping("/login")
+	public Mono<ResponseEntity<ResponseToken>> login(@RequestBody LoginDto loginDto) {
+	    return userServiceImpl.loginService(loginDto)
+	            .onErrorResume(Exception.class, e -> {
+	                // Handle exceptions without LOGGER
+	                return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+	                        .body(new ResponseToken("", 500, "", "", ""))); // Create a ResponseToken with minimal details
+	            });
 	}
 
 }

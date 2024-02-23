@@ -1,21 +1,22 @@
 package com.bridgelabz.user.service;
 
 import java.time.LocalDate;
-import java.util.Optional;
 
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.server.ServerResponse;
 
 import com.bridgelabz.exceptions.RegistrationException;
-import com.bridgelabz.response.Response;
+import com.bridgelabz.response.ResponseToken;
+import com.bridgelabz.user.dto.LoginDto;
 import com.bridgelabz.user.dto.UserDto;
 import com.bridgelabz.user.model.User;
 import com.bridgelabz.user.repository.UserRepository;
 import com.bridgelabz.util.StatusHelper;
+import com.bridgelabz.util.UserToken;
 
 import reactor.core.publisher.Mono;
 
@@ -28,44 +29,49 @@ public class UserServiceImpl implements IUserService {
 	@Autowired
 	private ModelMapper modelMapper;
 	
+	@Autowired
+	EmailService emailService;
 	
-	public Mono<Object> save(UserDto userDto) {
-	    User user = modelMapper.map(userDto, User.class);
-	    System.out.println("Before Mapping DTO: " + userDto);
+	@Autowired
+	PasswordEncoder passwordEncoder;
+
 	  
-	   
-	     return userRepository.findByEmail(user.getEmail())
-	            .flatMap(existingUser -> Mono.error(new RegistrationException(HttpStatus.BAD_REQUEST.value(), "User with the provided email already exists")))
-	            .switchIfEmpty(userRepository.save(user)
-	                    .then(Mono.just(ResponseEntity.ok().body(StatusHelper.statusInfo("User registered successfully", HttpStatus.OK.value()))))
-	                    .onErrorResume(error -> Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build())));
+	public Mono<Object> save(UserDto userDto) {
+		
+		userDto.setPassword(passwordEncoder.encode(userDto.getPassword()));  
+	    User user = modelMapper.map(userDto, User.class);
+	    System.out.println("Before Mapping DTO: " + userDto); 
+	    user.setRegisterdate(LocalDate.now());
+	       
+	    return userRepository.findByEmail(user.getEmail())
+	    		.flatMap(userExist -> Mono.error(new RegistrationException(HttpStatus.BAD_REQUEST.value(), "User Exist")))
+	    		.switchIfEmpty(userRepository.save(user)
+	    				.then(Mono.just(ResponseEntity.ok().body(StatusHelper.statusInfo("User Saved", HttpStatus.OK.value())))));
+	    		    	   
+	    	   
 	}
-	   
+	
+	public Mono<ResponseEntity<ResponseToken>> loginService(LoginDto loginDto) {
+		
+			return userRepository.findByEmail(loginDto.getEmail())
+	        .switchIfEmpty(Mono.error(new IllegalStateException("User not found")))
+	        .flatMap(user -> {
+	            if (passwordEncoder.matches(loginDto.getPassword(), user.getPassword())) {
+	                try {
+	                    String token = UserToken.generateToken(user.getId()); // Assuming secure token generation
+	                    return Mono.just(ResponseEntity.ok()
+	                        .body(new ResponseToken(token, 200, user.getName(), user.getEmail(), token)));
+	                } catch (Exception e) {
+	                    return Mono.error(new RuntimeException("Error generating token: " + e.getMessage()));
+	                }
+	            } else {
+	                return Mono.error(new IllegalArgumentException("Incorrect password"));
+	            }
+	        })
+	        .onErrorResume(Exception.class, e -> Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+	                .body(new ResponseToken("", 500, "", "", "")))); // Create a ResponseToken with minimal details
 
-
-
-
-
-//	@Override
-//	public Mono<ServerResponse> save(UserDto userDto) {
-//		User user = modelMapper.map(userDto, User.class);
-//		System.out.println("Before Mapping DTO"+userDto);
-//		Mono<User> userExist = userRepository.findByEmail(user.getEmail());
-//		System.out.println("User Exist: "+userExist.get());
-//		System.out.println("After Mapping"+user.toString());
-//		user.setRegisterdate(LocalDate.now());
-//		System.out.println("After Setting Register Date");
-//		boolean isUserPresent = userExist.isPresent();
-//		System.out.println("Boolean Is User Present"+isUserPresent);
-//		if (isUserPresent) {
-//	        return Mono.error(new RegistrationException(HttpStatus.BAD_REQUEST.value(), "User with the provided email already exists"));
-//	    } else {
-//	    	System.out.println("Inside Else");
-//	        return userRepository.save(user)
-//	            .flatMap(savedUser -> ServerResponse.ok().bodyValue(StatusHelper.statusInfo("User registered successfully", HttpStatus.OK.value())))
-//	            .switchIfEmpty(ServerResponse.status(HttpStatus.INTERNAL_SERVER_ERROR).build());
-//	    }
-//	}
-//
-}
+	}
+	
+	}
 
